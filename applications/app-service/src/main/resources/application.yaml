@@ -12,3 +12,13 @@ spring:
       path: /h2
   profiles:
     include:
+
+# Configuración de PostgreSQL
+adapters:
+  r2dbc:
+    host: localhost
+    port: 5438
+    database: dbCrediYa
+    schema: public
+    username: postgres
+    password: root
