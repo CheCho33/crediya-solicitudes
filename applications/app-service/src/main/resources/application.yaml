@@ -7,10 +7,15 @@ spring:
     add-properties: false
   h2:
     console:
-      enabled: true
+      enabled: false
       path: "/h2"
   profiles:
     include: null
+  flyway:
+    enabled: false
+    locations: classpath:sql
+    baseline-on-migrate: true
+    validate-on-migrate: true
 adapters:
   r2dbc:
     host: "localhost"
