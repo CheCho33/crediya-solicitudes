@@ -1,173 +1,124 @@
 package co.com.crediya.solicitudes.usecase.solicitud;
 
-import java.util.UUID;
-import java.util.function.Supplier;
-
 import co.com.crediya.solicitudes.model.estados.Estados;
 import co.com.crediya.solicitudes.model.estados.gateways.EstadosRepository;
 import co.com.crediya.solicitudes.model.solicitud.Solicitud;
-import co.com.crediya.solicitudes.model.solicitud.SolicitudId;
 import co.com.crediya.solicitudes.model.solicitud.gateways.SolicitudRepository;
 import co.com.crediya.solicitudes.model.tipoprestamo.TipoPrestamo;
-import co.com.crediya.solicitudes.model.tipoprestamo.TipoPrestamoId;
 import co.com.crediya.solicitudes.model.tipoprestamo.gateways.TipoPrestamoRepository;
-import co.com.crediya.solicitudes.model.valueobjects.Email;
-import co.com.crediya.solicitudes.model.valueobjects.Monto;
-import co.com.crediya.solicitudes.model.valueobjects.Plazo;
 import reactor.core.publisher.Mono;
 
 /**
  * Caso de uso para crear una nueva solicitud de préstamo.
- * 
- * Este caso de uso implementa las siguientes reglas de negocio:
- * - Valida que el tipo de préstamo seleccionado exista
- * - Asigna automáticamente el estado inicial "Pendiente de revisión"
- * - Valida que el monto esté dentro del rango permitido para el tipo de préstamo
- * - Genera un identificador único para la solicitud
- * - Persiste la solicitud en la base de datos
- * 
- * Sigue los principios de Arquitectura Hexagonal:
- * - Orquesta la lógica de negocio sin depender de detalles técnicos
- * - Utiliza programación reactiva con Project Reactor
- * - Mantiene la pureza del dominio
- * - Maneja errores de negocio de forma explícita
+ *
+ * Reglas de negocio:
+ * - Valida datos de entrada (cliente y préstamo)
+ * - Valida que el tipo de préstamo exista
+ * - Valida que el monto esté dentro del rango permitido por el tipo de préstamo
+ * - Asigna estado inicial "Pendiente de revisión"
+ * - Persiste la solicitud
  */
 public class CrearSolicitudUseCase {
-    
+
     private final SolicitudRepository solicitudRepository;
     private final TipoPrestamoRepository tipoPrestamoRepository;
     private final EstadosRepository estadosRepository;
-    private final Supplier<UUID> uuidGenerator;
-    
-    /**
-     * Constructor principal del caso de uso.
-     * 
-     * @param solicitudRepository repositorio de solicitudes
-     * @param tipoPrestamoRepository repositorio de tipos de préstamo
-     * @param estadosRepository repositorio de estados
-     * @param uuidGenerator generador de UUIDs
-     */
+
     public CrearSolicitudUseCase(SolicitudRepository solicitudRepository,
-                                TipoPrestamoRepository tipoPrestamoRepository,
-                                EstadosRepository estadosRepository,
-                                Supplier<UUID> uuidGenerator) {
+                                 TipoPrestamoRepository tipoPrestamoRepository,
+                                 EstadosRepository estadosRepository) {
         this.solicitudRepository = solicitudRepository;
         this.tipoPrestamoRepository = tipoPrestamoRepository;
         this.estadosRepository = estadosRepository;
-        this.uuidGenerator = uuidGenerator;
     }
-    
+
+    // --- API principal ---
+
     /**
-     * Constructor por defecto que usa UUID.randomUUID() como generador.
-     * Usado principalmente para testing y configuración automática.
+     * Crea una solicitud validando entradas y reglas de negocio.
+     * Nota: documentoIdentidad se valida como presente, aunque el modelo actual no lo persiste.
      */
-    public CrearSolicitudUseCase(SolicitudRepository solicitudRepository,
-                                TipoPrestamoRepository tipoPrestamoRepository,
-                                EstadosRepository estadosRepository) {
-        this(solicitudRepository, tipoPrestamoRepository, estadosRepository, UUID::randomUUID);
-    }
-    
-    /**
-     * Crea una nueva solicitud de préstamo.
-     * 
-     * @param montoSolicitado monto del préstamo solicitado
-     * @param plazoMeses plazo en meses del préstamo
-     * @param emailSolicitante email del solicitante
-     * @param idTipoPrestamo identificador del tipo de préstamo
-     * @return Mono con la solicitud creada
-     * @throws IllegalArgumentException si los datos de entrada son inválidos
-     * @throws IllegalStateException si el tipo de préstamo no existe o el estado inicial no está disponible
-     */
-    public Mono<Solicitud> crearSolicitud(Monto montoSolicitado, 
-                                         Plazo plazoMeses, 
-                                         Email emailSolicitante, 
-                                         TipoPrestamoId idTipoPrestamo) {
-        
+    public Mono<Solicitud> crearSolicitud(Double monto,
+                                          Double plazo,
+                                          String email,
+                                          Long idTipoPrestamo) {
+        // Validaciones de presencia y formato básico
+        if (monto == null || monto <= 0) {
+            return Mono.error(new IllegalArgumentException("El monto solicitado debe ser un número positivo"));
+        }
+        if (plazo == null || plazo <= 0) {
+            return Mono.error(new IllegalArgumentException("El plazo en meses debe ser un número positivo"));
+        }
+        if (email == null || email.trim().isEmpty()) {
+            return Mono.error(new IllegalArgumentException("El email del solicitante es obligatorio"));
+        }
+        if (idTipoPrestamo == null) {
+            return Mono.error(new IllegalArgumentException("El identificador del tipo de préstamo es obligatorio"));
+        }
+
         return validarTipoPrestamo(idTipoPrestamo)
-                .flatMap(tipoPrestamo -> validarMontoParaTipoPrestamo(montoSolicitado, tipoPrestamo))
-                .flatMap(tipoPrestamo -> obtenerEstadoInicial()
-                        .flatMap(estadoInicial -> crearYGuardarSolicitud(
-                                montoSolicitado, 
-                                plazoMeses, 
-                                emailSolicitante, 
-                                tipoPrestamo, 
-                                estadoInicial)));
+                .flatMap(tipo -> validarMontoParaTipoPrestamo(monto, tipo))
+                .flatMap(tipo -> obtenerEstadoInicial()
+                        .flatMap(estado -> crearYGuardarSolicitud(monto, plazo, email, tipo, estado))
+                );
     }
-    
+
     /**
-     * Valida que el tipo de préstamo exista en el sistema.
-     * 
-     * @param idTipoPrestamo identificador del tipo de préstamo
-     * @return Mono con el tipo de préstamo si existe
-     * @throws IllegalStateException si el tipo de préstamo no existe
+     * Sobrecarga que valida la presencia del documento de identidad del cliente.
+     * El modelo actual no lo persiste; se valida para cumplir el contrato de negocio.
      */
-    private Mono<TipoPrestamo> validarTipoPrestamo(TipoPrestamoId idTipoPrestamo) {
+    public Mono<Solicitud> crearSolicitud(Double monto,
+                                          Double plazo,
+                                          String email,
+                                          String documentoIdentidad,
+                                          Long idTipoPrestamo) {
+        if (documentoIdentidad == null || documentoIdentidad.trim().isEmpty()) {
+            return Mono.error(new IllegalArgumentException("El documento de identidad del cliente es obligatorio"));
+        }
+        return crearSolicitud(monto, plazo, email, idTipoPrestamo);
+    }
+
+    // --- Reglas de negocio privadas ---
+
+    private Mono<TipoPrestamo> validarTipoPrestamo(Long idTipoPrestamo) {
         return tipoPrestamoRepository.findById(idTipoPrestamo)
                 .switchIfEmpty(Mono.error(new IllegalStateException(
-                        "El tipo de préstamo con ID " + idTipoPrestamo.value() + " no existe")));
+                        "El tipo de préstamo con ID " + idTipoPrestamo + " no existe")));
     }
-    
-    /**
-     * Valida que el monto esté dentro del rango permitido para el tipo de préstamo.
-     * 
-     * @param montoSolicitado monto a validar
-     * @param tipoPrestamo tipo de préstamo para validar el monto
-     * @return Mono con el tipo de préstamo si la validación es exitosa
-     * @throws IllegalArgumentException si el monto no está en el rango permitido
-     */
-    private Mono<TipoPrestamo> validarMontoParaTipoPrestamo(Monto montoSolicitado, TipoPrestamo tipoPrestamo) {
-        if (!tipoPrestamo.montoValido(montoSolicitado)) {
+
+    private Mono<TipoPrestamo> validarMontoParaTipoPrestamo(Double monto, TipoPrestamo tipoPrestamo) {
+        Double min = tipoPrestamo.getMontoMinimo();
+        Double max = tipoPrestamo.getMontoMaximo();
+        if (min == null || max == null) {
+            return Mono.error(new IllegalStateException("El tipo de préstamo no tiene configurado el rango de montos"));
+        }
+        if (monto < min || monto > max) {
+            String nombre = tipoPrestamo.getNombre() != null ? tipoPrestamo.getNombre() : "desconocido";
             return Mono.error(new IllegalArgumentException(
-                    String.format("El monto $%,.2f no está dentro del rango permitido para el tipo de préstamo '%s' (%s)", 
-                            montoSolicitado.valor(), 
-                            tipoPrestamo.nombre().valor(),
-                            tipoPrestamo.obtenerRangoMontos())));
+                    String.format("El monto %.2f no está dentro del rango permitido para el tipo de préstamo '%s' (%.2f - %.2f)",
+                            monto, nombre, min, max)));
         }
         return Mono.just(tipoPrestamo);
     }
-    
-    /**
-     * Obtiene el estado inicial "Pendiente de revisión" para la nueva solicitud.
-     * 
-     * @return Mono con el estado inicial
-     * @throws IllegalStateException si el estado inicial no está disponible
-     */
+
     private Mono<Estados> obtenerEstadoInicial() {
-        return estadosRepository.findByNombre("Pendiente de revisión")
+        return estadosRepository.findByNombre("PENDIENTE")
                 .switchIfEmpty(Mono.error(new IllegalStateException(
-                        "El estado inicial 'Pendiente de revisión' no está disponible en el sistema")));
+                        "El estado inicial 'PENDIENTE' no está disponible en el sistema")));
     }
-    
-    /**
-     * Crea y guarda la solicitud en la base de datos.
-     * 
-     * @param montoSolicitado monto del préstamo
-     * @param plazoMeses plazo en meses
-     * @param emailSolicitante email del solicitante
-     * @param tipoPrestamo tipo de préstamo
-     * @param estadoInicial estado inicial
-     * @return Mono con la solicitud guardada
-     */
-    private Mono<Solicitud> crearYGuardarSolicitud(Monto montoSolicitado, 
-                                                   Plazo plazoMeses, 
-                                                   Email emailSolicitante, 
-                                                   TipoPrestamo tipoPrestamo, 
+
+    private Mono<Solicitud> crearYGuardarSolicitud(Double monto,
+                                                   Double plazo,
+                                                   String email,
+                                                   TipoPrestamo tipoPrestamo,
                                                    Estados estadoInicial) {
-        
-        // Generar identificador único para la solicitud
-        SolicitudId solicitudId = SolicitudId.newId(uuidGenerator);
-        
-        // Crear la entidad Solicitud
-        Solicitud solicitud = Solicitud.create(
-                solicitudId,
-                montoSolicitado,
-                plazoMeses,
-                emailSolicitante,
-                estadoInicial.idEstado(),
-                tipoPrestamo.id()
-        );
-        
-        // Guardar en la base de datos
+        Solicitud solicitud = new Solicitud();
+        solicitud.setMonto(monto);
+        solicitud.setPlazo(plazo);
+        solicitud.setEmail(email);
+        solicitud.setIdEstado(estadoInicial.getIdEstado());
+        solicitud.setIdTipoPrestamo(tipoPrestamo.getIdTipoPrestamo());
+
         return solicitudRepository.save(solicitud);
     }
 }
