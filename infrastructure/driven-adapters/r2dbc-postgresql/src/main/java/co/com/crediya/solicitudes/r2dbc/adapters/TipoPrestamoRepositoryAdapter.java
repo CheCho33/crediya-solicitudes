@@ -8,6 +8,7 @@ import co.com.crediya.solicitudes.r2dbc.repository.TipoPrestamoEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -19,6 +20,7 @@ public class TipoPrestamoRepositoryAdapter implements TipoPrestamoRepository {
     private final TipoPrestamoEntityRepository tipoPrestamoEntityRepository;
 
     @Override
+    @Transactional
     public Mono<TipoPrestamo> save(TipoPrestamo tipoPrestamo) {
         if (tipoPrestamo == null) return Mono.error(new IllegalArgumentException("Tipo de préstamo no puede ser null"));
 
@@ -30,6 +32,7 @@ public class TipoPrestamoRepositoryAdapter implements TipoPrestamoRepository {
 
 
     @Override
+    @Transactional(readOnly = true)
     public Mono<TipoPrestamo> findById(Long idTipoPrestamo) {
         if (idTipoPrestamo == null) return Mono.error(new IllegalArgumentException("ID no puede ser null"));
 

@@ -7,6 +7,7 @@ import co.com.crediya.solicitudes.r2dbc.repository.EstadosEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 @Repository
@@ -17,6 +18,7 @@ public class EstadosRepositoryAdapter implements EstadosRepository {
     private final EstadosEntityRepository estadosEntityRepository;
 
     @Override
+    @Transactional
     public Mono<Estados> save(Estados estado) {
         if (estado == null) return Mono.error(new IllegalArgumentException("Estado no puede ser null"));
 
@@ -27,6 +29,7 @@ public class EstadosRepositoryAdapter implements EstadosRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Mono<Estados> findById(Long idEstado) {
         if (idEstado == null) return Mono.error(new IllegalArgumentException("ID de estado no puede ser null"));
 
@@ -35,6 +38,7 @@ public class EstadosRepositoryAdapter implements EstadosRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Mono<Estados> findByNombre(String nombre) {
         if (nombre == null) return Mono.error(new IllegalArgumentException("Nombre de estado no puede ser null"));
 
