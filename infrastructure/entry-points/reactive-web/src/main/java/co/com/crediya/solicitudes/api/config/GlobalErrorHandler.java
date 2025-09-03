@@ -1,7 +1,6 @@
 package co.com.crediya.solicitudes.api.config;
 
-import java.nio.charset.StandardCharsets;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -10,8 +9,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
-
 import reactor.core.publisher.Mono;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Manejador global de errores para endpoints funcionales de WebFlux.
@@ -25,34 +25,39 @@ import reactor.core.publisher.Mono;
  * - No expone detalles internos del sistema
  */
 @Component
-@Order(-2) // Prioridad alta para capturar errores antes que otros handlers
+@Order(-2)// Prioridad alta para capturar errores antes que otros handlers
+@Slf4j
 public class GlobalErrorHandler implements ErrorWebExceptionHandler {
-    
+
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         ServerHttpResponse response = exchange.getResponse();
-        
+
+        if (response.isCommitted()) {
+            log.error("Error after response was committed: {}", ex.getMessage());
+            return Mono.error(ex);
+        }
+
         // Determinar el código de estado HTTP apropiado
         HttpStatus status = determineHttpStatus(ex);
-        
+
         // Crear mensaje de error estructurado
         String errorMessage = createErrorMessage(ex, status);
-        
+
         // Configurar headers de respuesta
         response.setStatusCode(status);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        
+
         // Log del error (simplificado)
-        System.err.println("Error no manejado en endpoint: " + 
-                exchange.getRequest().getPath() + " - Status: " + status + " - Error: " + ex.getMessage());
-        
+        log.error("Error no manejado en endpoint: {} - Status: {} - Error: {}",
+                exchange.getRequest().getPath(), status, ex.getMessage());
         // Escribir respuesta de error
         DataBuffer buffer = response.bufferFactory()
                 .wrap(errorMessage.getBytes(StandardCharsets.UTF_8));
-        
+
         return response.writeWith(Mono.just(buffer));
     }
-    
+
     /**
      * Determina el código de estado HTTP apropiado basado en el tipo de excepción.
      */
@@ -67,7 +72,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             return HttpStatus.INTERNAL_SERVER_ERROR;
         }
     }
-    
+
     /**
      * Crea un mensaje de error estructurado en formato JSON.
      */
@@ -75,15 +80,12 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
         return String.format("""
                 {
                     "timestamp": "%s",
-                    "status": %d,
                     "error": "%s",
                     "message": "%s",
-                    "path": "N/A"
                 }
                 """,
                 java.time.Instant.now(),
                 status.value(),
-                status.getReasonPhrase(),
                 ex.getMessage() != null ? ex.getMessage() : "Error interno del servidor"
         );
     }

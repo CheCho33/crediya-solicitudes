@@ -44,19 +44,14 @@ public class Handler {
         log.info("Inicio creación de solicitud");
         return serverRequest
                 .bodyToMono(CrearSolicitudRequest.class)
+                .doOnNext(dto -> log.info("DTO recibido: {}", dto))
                 .flatMap(req -> crearSolicitudUseCase
                         .crearSolicitud(req.monto(), req.plazo(), req.email(), req.idTipoPrestamo()))
                 .map(solicitudResponseMapper::toResponse)
-                .flatMap(resp -> ServerResponse.status(HttpStatus.CREATED)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(resp))
-                .onErrorResume(IllegalArgumentException.class, e ->
-                        ServerResponse.status(HttpStatus.BAD_REQUEST)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(e.getMessage()))
-                .onErrorResume(IllegalStateException.class, e ->
-                        ServerResponse.status(HttpStatus.CONFLICT)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(e.getMessage()));
+                .flatMap(respuesta -> ServerResponse.ok().bodyValue(respuesta))
+                .doOnSuccess(resp -> log.info("Solicitud creada exitosamente"))
+                .doOnError(error ->
+                    log.error("Error al crear la solicitud: {}", error.getMessage())
+                );
     }
 }

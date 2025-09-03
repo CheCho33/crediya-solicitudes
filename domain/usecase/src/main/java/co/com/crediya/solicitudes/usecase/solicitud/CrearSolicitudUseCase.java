@@ -2,6 +2,7 @@ package co.com.crediya.solicitudes.usecase.solicitud;
 
 import co.com.crediya.solicitudes.model.estados.Estados;
 import co.com.crediya.solicitudes.model.estados.gateways.EstadosRepository;
+import co.com.crediya.solicitudes.model.exceptions.CrediYautentiateException;
 import co.com.crediya.solicitudes.model.solicitud.Solicitud;
 import co.com.crediya.solicitudes.model.solicitud.gateways.SolicitudRepository;
 import co.com.crediya.solicitudes.model.tipoprestamo.TipoPrestamo;
@@ -32,69 +33,35 @@ public class CrearSolicitudUseCase {
         this.estadosRepository = estadosRepository;
     }
 
-    // --- API principal ---
 
-    /**
-     * Crea una solicitud validando entradas y reglas de negocio.
-     * Nota: documentoIdentidad se valida como presente, aunque el modelo actual no lo persiste.
-     */
-    public Mono<Solicitud> crearSolicitud(Double monto,
-                                          Double plazo,
-                                          String email,
-                                          Long idTipoPrestamo) {
+    public Mono<Solicitud> crearSolicitud(Double monto,Double plazo,String email,Long idTipoPrestamo) {
         // Validaciones de presencia y formato básico
-        if (monto == null || monto <= 0) {
-            return Mono.error(new IllegalArgumentException("El monto solicitado debe ser un número positivo"));
-        }
-        if (plazo == null || plazo <= 0) {
-            return Mono.error(new IllegalArgumentException("El plazo en meses debe ser un número positivo"));
-        }
-        if (email == null || email.trim().isEmpty()) {
-            return Mono.error(new IllegalArgumentException("El email del solicitante es obligatorio"));
-        }
-        if (idTipoPrestamo == null) {
-            return Mono.error(new IllegalArgumentException("El identificador del tipo de préstamo es obligatorio"));
-        }
 
-        return validarTipoPrestamo(idTipoPrestamo)
-                .flatMap(tipo -> validarMontoParaTipoPrestamo(monto, tipo))
+        return SolicitudValidator.validar( monto, plazo, email, idTipoPrestamo)
+                .flatMap(this::validarTipoPrestamo)
                 .flatMap(tipo -> obtenerEstadoInicial()
-                        .flatMap(estado -> crearYGuardarSolicitud(monto, plazo, email, tipo, estado))
-                );
+                        .flatMap(estado -> crearYGuardarSolicitud(monto, plazo, email, tipo, estado)))
+                .onErrorMap(this::mapearExcepciones);
+
     }
 
-    /**
-     * Sobrecarga que valida la presencia del documento de identidad del cliente.
-     * El modelo actual no lo persiste; se valida para cumplir el contrato de negocio.
-     */
-    public Mono<Solicitud> crearSolicitud(Double monto,
-                                          Double plazo,
-                                          String email,
-                                          String documentoIdentidad,
-                                          Long idTipoPrestamo) {
-        if (documentoIdentidad == null || documentoIdentidad.trim().isEmpty()) {
-            return Mono.error(new IllegalArgumentException("El documento de identidad del cliente es obligatorio"));
-        }
-        return crearSolicitud(monto, plazo, email, idTipoPrestamo);
-    }
 
     // --- Reglas de negocio privadas ---
 
-    private Mono<TipoPrestamo> validarTipoPrestamo(Long idTipoPrestamo) {
-        return tipoPrestamoRepository.findById(idTipoPrestamo)
-                .switchIfEmpty(Mono.error(new IllegalStateException(
-                        "El tipo de préstamo con ID " + idTipoPrestamo + " no existe")));
+    private Mono<TipoPrestamo> validarTipoPrestamo(Solicitud solicitud) {
+        return tipoPrestamoRepository.findById(solicitud.getIdTipoPrestamo())
+                .flatMap(tipo -> validarMontoParaTipoPrestamo(solicitud.getMonto(), tipo));
     }
 
     private Mono<TipoPrestamo> validarMontoParaTipoPrestamo(Double monto, TipoPrestamo tipoPrestamo) {
         Double min = tipoPrestamo.getMontoMinimo();
         Double max = tipoPrestamo.getMontoMaximo();
         if (min == null || max == null) {
-            return Mono.error(new IllegalStateException("El tipo de préstamo no tiene configurado el rango de montos"));
+            return Mono.error(new CrediYautentiateException("El tipo de préstamo no tiene configurado el rango de montos"));
         }
         if (monto < min || monto > max) {
             String nombre = tipoPrestamo.getNombre() != null ? tipoPrestamo.getNombre() : "desconocido";
-            return Mono.error(new IllegalArgumentException(
+            return Mono.error(new CrediYautentiateException(
                     String.format("El monto %.2f no está dentro del rango permitido para el tipo de préstamo '%s' (%.2f - %.2f)",
                             monto, nombre, min, max)));
         }
@@ -120,5 +87,17 @@ public class CrearSolicitudUseCase {
         solicitud.setIdTipoPrestamo(tipoPrestamo.getIdTipoPrestamo());
 
         return solicitudRepository.save(solicitud);
+    }
+
+    /**
+     * Mapea las excepciones del dominio a excepciones específicas.
+     */
+    private Throwable mapearExcepciones(Throwable error) {
+        if (error instanceof CrediYautentiateException) {
+            return error;
+        }
+        else{
+            return new CrediYautentiateException("Ha ocurrido un error inesperado al registrar el usuario. Por favor, intente nuevamente.");
+        }
     }
 }
