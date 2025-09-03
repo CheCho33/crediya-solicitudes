@@ -1,4 +1,4 @@
-package co.com.crediya.solicitudes.consumer.config;
+package co.com.crediya.solicitudes.config;
 
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -15,20 +15,16 @@ import static io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 @Configuration
-public class RestConsumerConfig {
+public class WebClientConfig {
 
-    private final String url;
+    @Value("${adapter.restconsumer.url}")
+    private String url;
 
-    private final int timeout;
-
-    public RestConsumerConfig(@Value("${adapter.restconsumer.url}") String url,
-                              @Value("${adapter.restconsumer.timeout}") int timeout) {
-        this.url = url;
-        this.timeout = timeout;
-    }
+    @Value("${adapter.restconsumer.timeout}")
+    private int timeout;
 
     @Bean
-    public WebClient getWebClient(WebClient.Builder builder) {
+    public WebClient webClient(WebClient.Builder builder) {
         return builder
             .baseUrl(url)
             .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
@@ -37,9 +33,6 @@ public class RestConsumerConfig {
     }
 
     private ClientHttpConnector getClientHttpConnector() {
-        /*
-        IF YO REQUIRE APPEND SSL CERTIFICATE SELF SIGNED: this should be in the default cacerts trustore
-        */
         return new ReactorClientHttpConnector(HttpClient.create()
                 .compress(true)
                 .keepAlive(true)
@@ -49,5 +42,4 @@ public class RestConsumerConfig {
                     connection.addHandlerLast(new WriteTimeoutHandler(timeout, MILLISECONDS));
                 }));
     }
-
 }

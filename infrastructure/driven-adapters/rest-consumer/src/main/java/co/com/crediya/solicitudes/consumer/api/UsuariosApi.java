@@ -17,10 +17,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.log4j.Log4j2;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 
 @Log4j2
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
 public class UsuariosApi {
     private final WebClient client;
