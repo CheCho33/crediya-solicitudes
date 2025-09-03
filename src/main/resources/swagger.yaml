@@ -1,0 +1,223 @@
+openapi: 3.0.1
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- url: http://localhost:8081
+  description: Generated server url
+paths:
+  /api/api/v1/usuarios:
+    post:
+      tags:
+      - Usuarios
+      summary: Crea un nuevo usuario
+      description: "Registra un usuario en el sistema y retorna mensaje de éxito con\
+        \ los datos almacenados. El usuario debe proporcionar nombre, apellido, email,\
+        \ documento de identidad, teléfono, rol y salario base."
+      operationId: guardarUsuario
+      parameters:
+      - name: x-token
+        in: header
+        description: Token de autenticación para acceder al servicio
+        required: true
+        schema:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      requestBody:
+        description: Datos del usuario a registrar
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrearUsuarioDto"
+        required: true
+      responses:
+        "200":
+          description: Usuario creado exitosamente
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RespuestaGenericaDto"
+        "400":
+          description: Solicitud inválida - Datos faltantes o incorrectos
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "401":
+          description: No autorizado - Token inválido o expirado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "409":
+          description: Conflicto - El email ya está registrado en el sistema
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "500":
+          description: Error interno del servidor
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+      security:
+      - x-token: []
+  /api/v1/login:
+    post:
+      tags:
+      - Autenticación
+      summary: Autentica un usuario y genera sesión
+      description: "Valida las credenciales del usuario (email y contraseña) y genera\
+        \ una sesión activa con un token JWT válido por 24 horas. Si el usuario ya\
+        \ tiene una sesión activa, se reutiliza. **NOTA: Este endpoint NO requiere\
+        \ autenticación previa.**"
+      operationId: loginUsuario
+      requestBody:
+        description: Credenciales de autenticación
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsuarioLoginDto"
+        required: true
+      responses:
+        "200":
+          description: Autenticación exitosa
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Sesion"
+        "400":
+          description: Solicitud inválida - Credenciales faltantes
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "401":
+          description: Credenciales inválidas - Usuario o contraseña incorrectos
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "500":
+          description: Error interno del servidor
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+  /api/v1/usuarios:
+    get:
+      tags:
+      - Usuarios
+      summary: Obtiene datos del usuario autenticado
+      description: Retorna los datos del usuario correspondiente a la sesión activa.
+        Requiere autenticación mediante token en el header 'x-token'.
+      operationId: getUsuario
+      parameters:
+      - name: x-token
+        in: header
+        description: Token de autenticación para acceder al servicio
+        required: true
+        schema:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        "200":
+          description: Datos del usuario obtenidos exitosamente
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsuarioResponseDto"
+        "401":
+          description: No autorizado - Token inválido o expirado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "404":
+          description: Usuario no encontrado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+        "500":
+          description: Error interno del servidor
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponseDto"
+      security:
+      - x-token: []
+components:
+  schemas:
+    CrearUsuarioDto:
+      type: object
+      properties:
+        nombre:
+          type: string
+        apellido:
+          type: string
+        email:
+          type: string
+        documentoIdentidad:
+          type: string
+        telefono:
+          type: string
+        rolId:
+          type: integer
+          format: int64
+        salarioBase:
+          type: number
+          format: double
+    RespuestaGenericaDto:
+      type: object
+      properties:
+        mensaje:
+          type: string
+        data:
+          type: object
+    ErrorResponseDto:
+      type: object
+    UsuarioLoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    Sesion:
+      type: object
+      properties:
+        sesionId:
+          type: integer
+          format: int64
+        usuarioId:
+          type: integer
+          format: int64
+        token:
+          type: string
+        fechaExpiracion:
+          type: string
+          format: date-time
+    UsuarioResponseDto:
+      type: object
+      properties:
+        usuarioId:
+          type: integer
+          format: int64
+        nombre:
+          type: string
+        apellido:
+          type: string
+        email:
+          type: string
+        documentoIdentidad:
+          type: string
+        telefono:
+          type: string
+        rolId:
+          type: integer
+          format: int64
+        salarioBase:
+          type: number
+          format: double
