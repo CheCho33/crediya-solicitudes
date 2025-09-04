@@ -3,6 +3,7 @@ package co.com.crediya.solicitudes.api;
 import co.com.crediya.solicitudes.api.dto.CrearSolicitudRequest;
 import co.com.crediya.solicitudes.api.mapper.CrearSolicitudRequestMapper;
 import co.com.crediya.solicitudes.api.mapper.SolicitudResponseMapper;
+import co.com.crediya.solicitudes.consumer.api.model.UsuarioResponseDto;
 import co.com.crediya.solicitudes.usecase.solicitud.CrearSolicitudUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,16 +43,38 @@ public class Handler {
 
     public Mono<ServerResponse> crearSolicitud(ServerRequest serverRequest) {
         log.info("Inicio creación de solicitud");
+
+        Object usuarioAttr = serverRequest.attribute("usuario").orElse(null);
+        UsuarioResponseDto usuarioResponseDto = (UsuarioResponseDto) usuarioAttr;
+
         return serverRequest
                 .bodyToMono(CrearSolicitudRequest.class)
                 .doOnNext(dto -> log.info("DTO recibido: {}", dto))
-                .flatMap(req -> crearSolicitudUseCase
-                        .crearSolicitud(req.monto(), req.plazo(), req.email(), req.idTipoPrestamo()))
-                .map(solicitudResponseMapper::toResponse)
-                .flatMap(respuesta -> ServerResponse.ok().bodyValue(respuesta))
-                .doOnSuccess(resp -> log.info("Solicitud creada exitosamente"))
+                .flatMap(request -> {
+                    if (!usuarioResponseDto.getEmail().equals(request.email())) {
+                        log.warn("El usuario no tiene permiso para crear solicitudes a nombre de otro usuario");
+                        return ServerResponse.status(HttpStatus.FORBIDDEN)
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .bodyValue("Solo puedes generar solicitudes a tu nombre.");
+                    }
+
+                    return crearSolicitudUseCase
+                            .crearSolicitud(request.monto(), request.plazo(), request.email(), request.idTipoPrestamo())
+                            .map(solicitudResponseMapper::toResponse)
+                            .flatMap(respuesta -> ServerResponse.ok().bodyValue(respuesta));
+                })
+                .doOnSuccess(resp -> {
+                    if (resp != null && resp.statusCode().is2xxSuccessful()) {
+                        log.info("Solicitud creada exitosamente");
+                    }
+                })
                 .doOnError(error ->
-                    log.error("Error al crear la solicitud: {}", error.getMessage())
+                        log.error("Error al crear la solicitud: {}", error.getMessage())
                 );
     }
+
+
+
+
+
 }
