@@ -5,6 +5,7 @@ import co.com.crediya.solicitudes.api.mapper.CrearSolicitudRequestMapper;
 import co.com.crediya.solicitudes.api.mapper.SolicitudResponseMapper;
 import co.com.crediya.solicitudes.consumer.api.model.UsuarioResponseDto;
 import co.com.crediya.solicitudes.usecase.solicitud.CrearSolicitudUseCase;
+import co.com.crediya.solicitudes.usecase.solicitud.ListarSolicitudesPendientesUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ import reactor.core.publisher.Mono;
 public class Handler {
 
     private final CrearSolicitudUseCase crearSolicitudUseCase;
+    private final ListarSolicitudesPendientesUseCase listarSolicitudesPendientesUseCase;
     private final SolicitudResponseMapper solicitudResponseMapper;
     private final CrearSolicitudRequestMapper crearSolicitudRequestMapper;
 
@@ -72,6 +74,41 @@ public class Handler {
                         log.error("Error al crear la solicitud: {}", error.getMessage())
                 );
     }
+
+    public Mono<ServerResponse> listarSolicitudesPendientes(ServerRequest serverRequest) {
+        log.info("Inicio listar solicitudes pendientes");
+
+        Object usuarioAttr = serverRequest.attribute("usuario").orElse(null);
+        UsuarioResponseDto usuarioResponseDto = (UsuarioResponseDto) usuarioAttr;
+
+        // Validar que el usuario tenga rol de administrador (rolId = 2)
+        if (usuarioResponseDto.getRolId() != 2L) {
+            log.warn("El usuario no tiene permiso para revisar solicitudes pendientes. Rol: {}", usuarioResponseDto.getRolId());
+            return ServerResponse.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .bodyValue("No tienes permiso para revisar solicitudes pendientes.");
+        }
+
+        return listarSolicitudesPendientesUseCase
+                .listarSolicitudesPendientes()
+                .map(solicitudResponseMapper::toResponse)
+                .collectList()
+                .flatMap(solicitudes -> {
+                    log.info("Se encontraron {} solicitudes pendientes", solicitudes.size());
+                    return ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(solicitudes);
+                })
+                .doOnSuccess(resp -> {
+                    if (resp != null && resp.statusCode().is2xxSuccessful()) {
+                        log.info("Solicitudes pendientes listadas exitosamente");
+                    }
+                })
+                .doOnError(error ->
+                        log.error("Error al listar solicitudes pendientes: {}", error.getMessage())
+                );
+    }
+
 
 
 

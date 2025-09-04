@@ -1,6 +1,7 @@
 package co.com.crediya.solicitudes.model.solicitud.gateways;
 
 import co.com.crediya.solicitudes.model.solicitud.Solicitud;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -25,5 +26,13 @@ public interface SolicitudRepository {
      */
     Mono<Solicitud> save(Solicitud solicitud);
 
+    /**
+     * Busca todas las solicitudes que tengan un estado específico.
+     *
+     * @param idEstado identificador del estado a buscar
+     * @return Flux con todas las solicitudes que tienen el estado especificado
+     * @throws IllegalArgumentException si el idEstado es null
+     */
+    Flux<Solicitud> findByIdEstado(Long idEstado);
 
 }

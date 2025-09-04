@@ -22,6 +22,7 @@ public class RouterRest {
     @Bean
     public RouterFunction<ServerResponse> routerFunction(Handler handler) {
         return route(POST("/api/v1/solicitud"), handler::crearSolicitud)
+                .andRoute(GET("/api/v1/solicitud"), handler::listarSolicitudesPendientes)
                 .andRoute(GET("/api/usecase/path"), handler::listenGETUseCase);
     }
 }

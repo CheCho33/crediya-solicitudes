@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Repository
@@ -25,6 +26,15 @@ public class SolicitudRepositoryAdapter implements SolicitudRepository {
         return Mono.just(solicitud)
                 .map(SolicitudMapper::toEntity)
                 .flatMap(solicitudEntityRepository::save)
+                .map(SolicitudMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Flux<Solicitud> findByIdEstado(Long idEstado) {
+        if (idEstado == null) return Flux.error(new IllegalArgumentException("ID de estado no puede ser null"));
+
+        return solicitudEntityRepository.findByIdEstado(idEstado)
                 .map(SolicitudMapper::toDomain);
     }
 
