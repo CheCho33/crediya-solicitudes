@@ -2,11 +2,11 @@ dependencies {
     implementation project(':model')
 
     // Alinear JUnit 5 y herramientas de test solo para este módulo
-    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation platform('org.junit:junit-bom:5.13.0-M3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testImplementation 'org.mockito:mockito-core:5.8.0'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
-    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testImplementation 'org.mockito:mockito-core:5.18.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.18.0'
+    testImplementation 'org.assertj:assertj-core:4.0.0-M1'
     testImplementation "io.projectreactor:reactor-test:${reactorVersion}"
 
 }
