@@ -11,13 +11,6 @@ import reactor.core.publisher.Mono;
 
 /**
  * Caso de uso para crear una nueva solicitud de préstamo.
- *
- * Reglas de negocio:
- * - Valida datos de entrada (cliente y préstamo)
- * - Valida que el tipo de préstamo exista
- * - Valida que el monto esté dentro del rango permitido por el tipo de préstamo
- * - Asigna estado inicial "Pendiente de revisión"
- * - Persiste la solicitud
  */
 public class CrearSolicitudUseCase {
 

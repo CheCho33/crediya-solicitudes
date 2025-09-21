@@ -1,13 +1,14 @@
 package co.com.crediya.solicitudes.r2dbc.adapters;
 
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
 import co.com.crediya.solicitudes.model.solicitud.Solicitud;
 import co.com.crediya.solicitudes.model.solicitud.gateways.SolicitudRepository;
 import co.com.crediya.solicitudes.r2dbc.mapper.SolicitudMapper;
 import co.com.crediya.solicitudes.r2dbc.repository.SolicitudEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -35,6 +36,15 @@ public class SolicitudRepositoryAdapter implements SolicitudRepository {
         if (idEstado == null) return Flux.error(new IllegalArgumentException("ID de estado no puede ser null"));
 
         return solicitudEntityRepository.findByIdEstado(idEstado)
+                .map(SolicitudMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Mono<Solicitud> findByEmail(String email) {
+        if (email == null) return Mono.error(new IllegalArgumentException("Email no puede ser null"));
+
+        return solicitudEntityRepository.findByEmail(email)
                 .map(SolicitudMapper::toDomain);
     }
 

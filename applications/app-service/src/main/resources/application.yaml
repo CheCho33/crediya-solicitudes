@@ -43,9 +43,10 @@ adapter:
     timeout: 5000
     url: "http://localhost:8081"
   sqs:
-    region: "us-east-1"
-    queueUrl: "http://localhost:4566/000000000000/sample"
-    endpoint: "http://localhost:4566 # For localstack only"
+    region: "${AWS_REGION}"
+    queueUrl: "${AWS_QUEUE_URL}"
+    accessKeyId: "${AWS_ACCESS_KEY_ID}"
+    secretKey: "${AWS_SECRET_KEY}"
 resilience4j:
   circuitbreaker:
     instances:

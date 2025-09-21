@@ -4,9 +4,10 @@ import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.data.repository.reactive.ReactiveSortingRepository;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
 
 import co.com.crediya.solicitudes.r2dbc.entities.SolicitudEntity;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Repositorio reactivo para la entidad Solicitud.
@@ -25,4 +26,8 @@ public interface SolicitudEntityRepository extends ReactiveCrudRepository<Solici
     // Query nativa para obtener solicitudes por estado
     @Query("SELECT id_solicitud, monto, plazo, email, id_estado, id_tipo_prestamo FROM solicitudes WHERE id_estado = :idEstado")
     Flux<SolicitudEntity> findByIdEstado(Long idEstado);
+    
+    // Query nativa para obtener solicitud por email
+    @Query("SELECT id_solicitud, monto, plazo, email, id_estado, id_tipo_prestamo FROM solicitudes WHERE email = :email LIMIT 1")
+    Mono<SolicitudEntity> findByEmail(String email);
 }

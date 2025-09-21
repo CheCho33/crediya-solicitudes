@@ -10,6 +10,10 @@ import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvide
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.SystemPropertyCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import org.springframework.util.StringUtils;
 import software.amazon.awssdk.metrics.MetricPublisher;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
@@ -26,12 +30,20 @@ public class SQSSenderConfig {
                 .endpointOverride(resolveEndpoint(properties))
                 .region(Region.of(properties.region()))
                 .overrideConfiguration(o -> o.addMetricPublisher(publisher))
-                .credentialsProvider(getProviderChain())
+                .credentialsProvider(getProviderChain(properties))
                 .build();
     }
 
-    private AwsCredentialsProviderChain getProviderChain() {
-        return AwsCredentialsProviderChain.builder()
+    private AwsCredentialsProvider getProviderChain(SQSSenderProperties properties) {
+        var providers = AwsCredentialsProviderChain.builder();
+
+        if (StringUtils.hasText(properties.accessKeyId())) {
+            providers.addCredentialsProvider(StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create(properties.accessKeyId(), properties.secretKey())
+            ));
+        }
+
+        return providers
                 .addCredentialsProvider(EnvironmentVariableCredentialsProvider.create())
                 .addCredentialsProvider(SystemPropertyCredentialsProvider.create())
                 .addCredentialsProvider(WebIdentityTokenFileCredentialsProvider.create())

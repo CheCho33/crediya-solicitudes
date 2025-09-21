@@ -35,4 +35,13 @@ public interface SolicitudRepository {
      */
     Flux<Solicitud> findByIdEstado(Long idEstado);
 
+    /**
+     * Busca una solicitud específica por email.
+     *
+     * @param email email de la solicitud a buscar
+     * @return Mono con la solicitud si existe, Mono.empty() si no existe
+     * @throws IllegalArgumentException si el email es null
+     */
+    Mono<Solicitud> findByEmail(String email);
+
 }

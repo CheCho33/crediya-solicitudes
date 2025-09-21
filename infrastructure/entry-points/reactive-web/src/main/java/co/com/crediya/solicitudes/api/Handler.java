@@ -1,18 +1,22 @@
 package co.com.crediya.solicitudes.api;
 
-import co.com.crediya.solicitudes.api.dto.CrearSolicitudRequest;
-import co.com.crediya.solicitudes.api.mapper.CrearSolicitudRequestMapper;
-import co.com.crediya.solicitudes.api.mapper.SolicitudResponseMapper;
-import co.com.crediya.solicitudes.consumer.api.model.UsuarioResponseDto;
-import co.com.crediya.solicitudes.usecase.solicitud.CrearSolicitudUseCase;
-import co.com.crediya.solicitudes.usecase.solicitud.ListarSolicitudesPendientesUseCase;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+
+import co.com.crediya.solicitudes.api.dto.CambiarEstadoSolicitudRequest;
+import co.com.crediya.solicitudes.api.dto.CrearSolicitudRequest;
+import co.com.crediya.solicitudes.api.mapper.CambiarEstadoSolicitudRequestMapper;
+import co.com.crediya.solicitudes.api.mapper.CrearSolicitudRequestMapper;
+import co.com.crediya.solicitudes.api.mapper.SolicitudResponseMapper;
+import co.com.crediya.solicitudes.consumer.api.model.UsuarioResponseDto;
+import co.com.crediya.solicitudes.usecase.solicitud.CambiarEstadoSolicitudUseCase;
+import co.com.crediya.solicitudes.usecase.solicitud.CrearSolicitudUseCase;
+import co.com.crediya.solicitudes.usecase.solicitud.ListarSolicitudesPendientesUseCase;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
@@ -36,8 +40,10 @@ public class Handler {
 
     private final CrearSolicitudUseCase crearSolicitudUseCase;
     private final ListarSolicitudesPendientesUseCase listarSolicitudesPendientesUseCase;
+    private final CambiarEstadoSolicitudUseCase cambiarEstadoSolicitudUseCase;
     private final SolicitudResponseMapper solicitudResponseMapper;
     private final CrearSolicitudRequestMapper crearSolicitudRequestMapper;
+    private final CambiarEstadoSolicitudRequestMapper cambiarEstadoSolicitudRequestMapper;
 
     public Mono<ServerResponse> listenGETUseCase(ServerRequest serverRequest) {
         return ServerResponse.ok().bodyValue("");
@@ -109,9 +115,42 @@ public class Handler {
                 );
     }
 
+    public Mono<ServerResponse> cambiarEstadoSolicitud(ServerRequest serverRequest) {
+        log.info("Inicio cambio de estado de solicitud");
 
+        Object usuarioAttr = serverRequest.attribute("usuario").orElse(null);
+        UsuarioResponseDto usuarioResponseDto = (UsuarioResponseDto) usuarioAttr;
 
+        // Validar que el usuario tenga rol de administrador (rolId = 2) o vendedor (rolId = 3)
+        if (usuarioResponseDto.getRolId() != 2L && usuarioResponseDto.getRolId() != 1L) {
+            log.warn("El usuario no tiene permiso para cambiar el estado de una solicitud. Rol: {}", usuarioResponseDto.getRolId());
+            return ServerResponse.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .bodyValue("El usuario no tiene permiso para cambiar el estado de una solicitud");
+        }
 
-
+        return serverRequest
+                .bodyToMono(CambiarEstadoSolicitudRequest.class)
+                .doOnNext(dto -> log.info("DTO recibido para cambio de estado: {}", dto))
+                .flatMap(request -> {
+                    String email = cambiarEstadoSolicitudRequestMapper.getEmail(request);
+                    String nuevoEstado = cambiarEstadoSolicitudRequestMapper.getNuevoEstado(request);
+                    
+                    return cambiarEstadoSolicitudUseCase
+                            .cambiarEstadoSolicitud(email, nuevoEstado)
+                            .map(solicitudResponseMapper::toResponse)
+                            .flatMap(respuesta -> ServerResponse.ok()
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .bodyValue(respuesta));
+                })
+                .doOnSuccess(resp -> {
+                    if (resp != null && resp.statusCode().is2xxSuccessful()) {
+                        log.info("Estado de solicitud cambiado exitosamente");
+                    }
+                })
+                .doOnError(error ->
+                        log.error("Error al cambiar el estado de la solicitud: {}", error.getMessage())
+                );
+    }
 
 }
